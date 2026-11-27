@@ -26,6 +26,7 @@ fun BookReader(
     book: Book,
     filePath: String,
     onBack: () -> Unit,
+    onDocumentLoaded: (totalPages: Int) -> Unit,
     onProgress: (page: Int, scrollRatio: Float) -> Unit,
 ) {
     MaterialTheme {
@@ -49,7 +50,7 @@ fun BookReader(
                 filePath = filePath,
                 initialPage = book.lastPage,
                 initialScrollRatio = book.scrollRatio,
-                onDocumentLoaded = { /* 页数在进度写入时一并回填 */ },
+                onDocumentLoaded = onDocumentLoaded,
                 onProgressChanged = onProgress,
                 modifier = Modifier.fillMaxSize().padding(padding),
             )
