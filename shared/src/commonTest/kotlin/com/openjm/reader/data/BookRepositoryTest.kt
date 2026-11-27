@@ -95,6 +95,37 @@ class BookRepositoryTest {
     }
 
     @Test
+    fun updateProgressKeepsIdentityAndWritesPageAndRatio() {
+        val repo = InMemoryBookRepository(
+            listOf(book("a", title = "深入理解计算机系统.pdf", localPath = "books/a.pdf", fileSize = 100)),
+        )
+
+        repo.updateProgress("a", lastPage = 7, scrollRatio = 0.42f, totalPages = 30)
+
+        val stored = repo.recent().single()
+        assertEquals(7, stored.lastPage)
+        assertEquals(0.42f, stored.scrollRatio)
+        assertEquals(30, stored.totalPages)
+        assertEquals("深入理解计算机系统.pdf", stored.title, "进度写入不能动标题")
+        assertEquals("books/a.pdf", stored.localPath, "进度写入不能动本地路径")
+        assertEquals(100, stored.fileSize.toInt())
+    }
+
+    @Test
+    fun updateProgressIgnoresUnknownDocAndClampsValues() {
+        val repo = InMemoryBookRepository(listOf(book("a")))
+
+        repo.updateProgress("missing", lastPage = 3, scrollRatio = 0.5f)
+        assertEquals(1, repo.recent().size, "进度不该凭空造出书架条目")
+
+        repo.updateProgress("a", lastPage = -5, scrollRatio = 9f, totalPages = 0)
+        val stored = repo.recent().single()
+        assertEquals(0, stored.lastPage, "页码不允许为负")
+        assertEquals(1f, stored.scrollRatio, "比例要收敛到 0..1")
+        assertEquals(0, stored.totalPages, "totalPages 传 0 表示不更新")
+    }
+
+    @Test
     fun deleteRemovesOnlyTheGivenDoc() {
         val repo = InMemoryBookRepository()
         repo.upsert(book("a"))
