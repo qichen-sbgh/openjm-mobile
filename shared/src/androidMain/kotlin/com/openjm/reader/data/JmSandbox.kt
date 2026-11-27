@@ -44,6 +44,10 @@ class JmSandbox(val root: File) {
 
     /** 书架里存的相对路径，避免把绝对路径写进表里（换机/重装后失效）。 */
     fun relativeBookPath(docId: String, ext: String): String = "books/$docId.$ext"
+
+    fun coverFile(docId: String): File = File(coversDir, "$docId.webp")
+
+    fun relativeCoverPath(docId: String): String = "covers/$docId.webp"
 }
 
 /**

@@ -12,11 +12,13 @@ import androidx.compose.runtime.mutableStateOf
 import com.openjm.reader.crypto.JmError
 import com.openjm.reader.crypto.parseRootKeys
 import com.openjm.reader.data.Book
+import com.openjm.reader.data.CoverStore
 import com.openjm.reader.data.InMemoryBookRepository
 import com.openjm.reader.data.JmSandbox
 import com.openjm.reader.data.JmSandboxImporter
 import com.openjm.reader.ui.App
 import com.openjm.reader.ui.BookReader
+import com.openjm.reader.ui.PdfPageRenderer
 import java.io.File
 import java.io.IOException
 import java.util.concurrent.Executors
@@ -38,6 +40,8 @@ class MainActivity : ComponentActivity() {
     private val worker = Executors.newSingleThreadExecutor()
 
     private lateinit var importer: JmSandboxImporter
+    private lateinit var sandbox: JmSandbox
+    private lateinit var coverStore: CoverStore
     private var hasRootKeys = false
 
     /** 阅读进度节流：滚动是逐像素回调的，落库按 500ms 节流（`docs/tech/mobile.md` §6）。 */
@@ -56,13 +60,16 @@ class MainActivity : ComponentActivity() {
 
         val rootKeys = loadRootKeys()
         hasRootKeys = rootKeys.isNotEmpty()
-        importer = JmSandboxImporter(JmSandbox(filesDir), rootKeys)
+        sandbox = JmSandbox(filesDir)
+        importer = JmSandboxImporter(sandbox, rootKeys)
+        coverStore = CoverStore(sandbox)
 
         setContent {
             val book = openBook.value
             if (book == null) {
                 App(
                     books = shelf.value,
+                    coverBaseDir = filesDir.absolutePath,
                     onImport = { pickJm.launch(arrayOf("*/*")) },
                     onOpen = { opened ->
                         readerTotalPages = opened.totalPages
@@ -140,7 +147,10 @@ class MainActivity : ComponentActivity() {
             try {
                 val stream = contentResolver.openInputStream(uri)
                     ?: throw IOException("文件已失效，请在 QQ 重新下载")
-                val book = stream.use { importer.import(it) }
+                val imported = stream.use { importer.import(it) }
+                // 封面失败不影响导入：书先进书架，缩略图退回占位块。
+                val coverPath = buildCover(imported)
+                val book = if (coverPath != null) imported.copy(coverPath = coverPath) else imported
                 val isNew = repository.upsert(book)
                 runOnUiThread {
                     shelf.value = repository.recent()
@@ -154,6 +164,24 @@ class MainActivity : ComponentActivity() {
             } catch (e: Exception) {
                 toastOnUi(e.message ?: "导入失败")
             }
+        }
+    }
+
+    /**
+     * 生成封面：PDFium 渲染首帧 → WebP 落 `covers/{doc_id}.webp`。
+     * 失败返回 null（书架用占位块），绝不因为封面失败把整次导入判负。
+     */
+    private fun buildCover(book: Book): String? {
+        val renderer = PdfPageRenderer(File(filesDir, book.localPath))
+        return try {
+            if (renderer.open(this) <= 0) return null
+            val widthPx = (COVER_WIDTH_DP * resources.displayMetrics.density).toInt().coerceIn(120, 720)
+            val bitmap = renderer.render(0, widthPx) ?: return null
+            coverStore.save(book.docId, bitmap)
+        } catch (e: Exception) {
+            null
+        } finally {
+            renderer.close()
         }
     }
 
@@ -178,5 +206,8 @@ class MainActivity : ComponentActivity() {
     private companion object {
         const val KEYS_ASSET = "keys.json"
         const val PROGRESS_THROTTLE_MS = 500L
+
+        /** 封面渲染宽度（dp）：书架缩略图 48dp 宽，取 160dp 保证高密度屏也清晰。 */
+        const val COVER_WIDTH_DP = 160f
     }
 }
