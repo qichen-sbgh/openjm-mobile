@@ -44,6 +44,9 @@ class MainActivity : ComponentActivity() {
     private var lastProgressWriteAt = 0L
     private var pendingProgress: Pair<Int, Float>? = null
 
+    /** 阅读页报上来的总页数；写入进度时一并回填，书架才能显示「第 x/y 页」。 */
+    private var readerTotalPages = 0
+
     private val pickJm = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let(::importFrom)
     }
@@ -61,7 +64,10 @@ class MainActivity : ComponentActivity() {
                 App(
                     books = shelf.value,
                     onImport = { pickJm.launch(arrayOf("*/*")) },
-                    onOpen = { openBook.value = it },
+                    onOpen = { opened ->
+                        readerTotalPages = opened.totalPages
+                        openBook.value = opened
+                    },
                 )
             } else {
                 BookReader(
@@ -71,12 +77,26 @@ class MainActivity : ComponentActivity() {
                         flushProgress()
                         openBook.value = null
                     },
+                    onDocumentLoaded = { pages -> readerTotalPages = pages },
                     onProgress = ::onReaderProgress,
                 )
             }
         }
 
         when (intent?.action) {
+            Intent.ACTION_VIEW -> intent.data?.let(::importFrom)
+            Intent.ACTION_SEND -> sharedUri(intent)?.let(::importFrom)
+        }
+    }
+
+    /**
+     * 已经在前台时再收到 QQ 的 VIEW / SEND：`singleTop` 会把请求送到这里，
+     * 不走 onCreate。缺了这一段，用户"点第二份文件没反应"，还以为是文件坏了。
+     */
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        when (intent.action) {
             Intent.ACTION_VIEW -> intent.data?.let(::importFrom)
             Intent.ACTION_SEND -> sharedUri(intent)?.let(::importFrom)
         }
@@ -103,7 +123,7 @@ class MainActivity : ComponentActivity() {
         val (page, ratio) = pendingProgress ?: return
         val book = openBook.value ?: return
         pendingProgress = null
-        repository.updateProgress(book.docId, page, ratio)
+        repository.updateProgress(book.docId, page, ratio, readerTotalPages)
         shelf.value = repository.recent()
     }
 
