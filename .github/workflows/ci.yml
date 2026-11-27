@@ -16,7 +16,11 @@ jobs:
           distribution: temurin
           java-version: "21"
 
-      - uses: android-actions/setup-android@v3
+      # runner 自带 Android SDK；setup-android 会去装已下架的 'tools' 包，反而失败
+      - name: Show Android SDK
+        run: |
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          ls "$ANDROID_HOME/platforms" || true
 
       # 只构建 Android；iOS 冻结在 M4 之前不参与 CI（见 openjm decisions D10）
       # 向量仓是私有的，CI 里拿不到 → 回放用例自动 skip，构建与编译仍是硬门槛
