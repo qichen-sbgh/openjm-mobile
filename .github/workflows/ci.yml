@@ -29,6 +29,14 @@ jobs:
           repository: qichen-sbgh/openjm
           path: openjm
 
+      # 防呆：向量没拉到时明确失败，不要退回"静默 skip"
+      - name: Verify vectors present
+        run: |
+          set -e
+          test -f "$PWD/openjm/testvectors/manifest.json"
+          ls "$PWD/openjm/testvectors/valid" | head
+          echo "vectors OK"
+
       # 只构建 Android；iOS 冻结在 M4 之前不参与 CI（见 openjm decisions D10）
       - name: Build and test
         env:
