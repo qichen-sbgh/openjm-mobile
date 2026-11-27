@@ -42,6 +42,14 @@ class JsonBookRepository(private val storeFile: File) : BookRepository {
         if (books.remove(docId) != null) persist()
     }
 
+    override fun rename(docId: String, title: String) {
+        val existing = books[docId] ?: return
+        val name = title.trim()
+        if (name.isEmpty() || name == existing.title) return
+        books[docId] = existing.copy(title = name)
+        persist()
+    }
+
     private fun load() {
         if (!storeFile.isFile) return
         val text = runCatching { storeFile.readText() }.getOrNull() ?: return

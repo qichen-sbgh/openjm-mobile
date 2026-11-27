@@ -41,6 +41,9 @@ interface BookRepository {
     fun recent(): List<Book>
 
     fun delete(docId: String)
+
+    /** 改书架上的显示名。只动 `title`，正文路径与阅读进度都不受影响。 */
+    fun rename(docId: String, title: String)
 }
 
 /**
@@ -81,5 +84,11 @@ class InMemoryBookRepository(initial: List<Book> = emptyList()) : BookRepository
 
     override fun delete(docId: String) {
         books.remove(docId)
+    }
+
+    override fun rename(docId: String, title: String) {
+        val existing = books[docId] ?: return
+        val name = title.trim().ifEmpty { return }
+        books[docId] = existing.copy(title = name)
     }
 }
