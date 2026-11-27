@@ -2,6 +2,8 @@
 
 `.jm` 加密文档的移动端阅读器：在 QQ 里点开 `.jm`，校验、解密、进书架、原生渲染 PDF。
 
+`compatible: proto-v1`
+
 协议与跨端测试向量在 [`openjm`](https://github.com/qichen-sbgh/openjm) 仓库，本仓只实现消费端，不改协议。
 
 > **状态：骨架**。共享模块的协议核心已经写完，Android/iOS 的加密原语也已落代码，但**本仓库尚未在任何机器上编译通过**——生成它的环境没有 JDK 与 Xcode。第一次用 Android Studio / Xcode 打开时，请按下面的清单逐项过。
@@ -81,7 +83,7 @@ iosApp/                        # Xcode 壳：自定义 UTI + onOpenURL
 | 依赖 | 来源 | 说明 |
 | --- | --- | --- |
 | 协议语义 | `openjm/docs/protocol-v1.md` | 冻结，任何改动先改协议 |
-| 测试向量 | `openjm/testvectors/` | 12 个样本，三端必须一致 |
+| 测试向量 | `openjm/testvectors/` | 11 个样本，三端必须一致 |
 | 测试根密钥 | `openjm/testvectors/keys.test.json` | `key_id=254`，只进测试 source set |
 
 生产根密钥不放任何仓库，见 `openjm/docs/key-registry.md`。
