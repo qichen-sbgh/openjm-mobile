@@ -66,10 +66,18 @@ class JmSandboxImporter(
     private val now: () -> Long = { System.currentTimeMillis() },
 ) {
 
-    fun import(input: InputStream, password: String? = null): Book {
+    /**
+     * @param onBytesRead 每读一段就回调已读字节数，给 UI 画进度；传 null 就完全不计数。
+     */
+    fun import(
+        input: InputStream,
+        password: String? = null,
+        onBytesRead: ((Long) -> Unit)? = null,
+    ): Book {
         sandbox.ensureLayout()
         val tmp = File(sandbox.tmpDir, "${UUID.randomUUID()}.tmp")
-        val source = InputStreamSource(input)
+        val stream = if (onBytesRead != null) ProgressInputStream(input, onBytesRead) else input
+        val source = InputStreamSource(stream)
         try {
             val (header, headerBytes) = JmImporter.readHeader(source)
             val result = FileOutputStream(tmp).use { out ->

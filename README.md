@@ -127,6 +127,8 @@ keyPassword=…
 - [x] PDFium 渲染：`io.legere:pdfiumandroid` + 纵向分页列表，一页一张 Bitmap，占位用首页比例
 - [x] 首页封面：PDFium 渲染首帧 → WebP（质量 80）存 `covers/{doc_id}.webp`，书架行显示 48×64dp 缩略图
 - [x] 口令弹窗：口令文件弹出输入框重试，先验证再落盘，错口令不留任何文件
+- [x] 导入进度：底部进度条（拿得到 SIZE 就走百分比，拿不到走不确定进度），不再"黑屏等"
+- [x] 应用图标：自适应图标（折角纸 + 钥匙孔），矢量实现，minSdk 26 起不需要各密度 PNG
 - [x] 进度落库：`books/index.json`（500ms 节流 + 退出补写），杀进程重进还原页码与页内偏移
 - [x] 发版瘦身：release 只打 arm64-v8a / armeabi-v7a（4 套 ABI 的 29MB → 16MB）
 - [x] 发版签名：`keystore.properties` + JKS（均不入库），`assembleRelease` 直出可安装包
