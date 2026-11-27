@@ -3,6 +3,7 @@ package com.openjm.reader.android
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.os.SystemClock
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -15,6 +16,8 @@ import com.openjm.reader.data.InMemoryBookRepository
 import com.openjm.reader.data.JmSandbox
 import com.openjm.reader.data.JmSandboxImporter
 import com.openjm.reader.ui.App
+import com.openjm.reader.ui.BookReader
+import java.io.File
 import java.io.IOException
 import java.util.concurrent.Executors
 
@@ -25,17 +28,21 @@ import java.util.concurrent.Executors
  * 校验通过才 rename 成 `files/books/{doc_id}.pdf` → 写书架。
  * 导入跑在单线程 worker 上，主线程只负责刷 UI：大文件也不会有 ANR 风险。
  *
- * 还没接（见 `shared/.../ui/PdfReaderCanvas.android.kt` 与 README TODO）：
- * 口令弹窗、Room KMP 持久化、封面、阅读与进度。
+ * 还没接（见 README 待办）：口令弹窗、Room KMP 持久化、封面、进度落盘。
  */
 class MainActivity : ComponentActivity() {
 
     private val repository = InMemoryBookRepository()
     private val shelf = mutableStateOf<List<Book>>(emptyList())
+    private val openBook = mutableStateOf<Book?>(null)
     private val worker = Executors.newSingleThreadExecutor()
 
     private lateinit var importer: JmSandboxImporter
     private var hasRootKeys = false
+
+    /** 阅读进度节流：滚动是逐像素回调的，落库按 500ms 节流（`docs/tech/mobile.md` §6）。 */
+    private var lastProgressWriteAt = 0L
+    private var pendingProgress: Pair<Int, Float>? = null
 
     private val pickJm = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let(::importFrom)
@@ -49,11 +56,24 @@ class MainActivity : ComponentActivity() {
         importer = JmSandboxImporter(JmSandbox(filesDir), rootKeys)
 
         setContent {
-            App(
-                books = shelf.value,
-                onImport = { pickJm.launch(arrayOf("*/*")) },
-                onOpen = { /* TODO(m2-B)：跳到 PdfReaderCanvas */ },
-            )
+            val book = openBook.value
+            if (book == null) {
+                App(
+                    books = shelf.value,
+                    onImport = { pickJm.launch(arrayOf("*/*")) },
+                    onOpen = { openBook.value = it },
+                )
+            } else {
+                BookReader(
+                    book = book,
+                    filePath = File(filesDir, book.localPath).absolutePath,
+                    onBack = {
+                        flushProgress()
+                        openBook.value = null
+                    },
+                    onProgress = ::onReaderProgress,
+                )
+            }
         }
 
         when (intent?.action) {
@@ -63,8 +83,28 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        flushProgress()
         worker.shutdown()
         super.onDestroy()
+    }
+
+    /** 阅读页回调：每滚一下就记下最新值，但最多每 [PROGRESS_THROTTLE_MS] 落一次。 */
+    private fun onReaderProgress(page: Int, scrollRatio: Float) {
+        pendingProgress = page to scrollRatio
+        val now = SystemClock.elapsedRealtime()
+        if (now - lastProgressWriteAt >= PROGRESS_THROTTLE_MS) {
+            lastProgressWriteAt = now
+            flushProgress()
+        }
+    }
+
+    /** 退出阅读页 / 退到后台前补写一次，保证"最后翻到哪儿"不丢。 */
+    private fun flushProgress() {
+        val (page, ratio) = pendingProgress ?: return
+        val book = openBook.value ?: return
+        pendingProgress = null
+        repository.updateProgress(book.docId, page, ratio)
+        shelf.value = repository.recent()
     }
 
     /**
@@ -117,5 +157,6 @@ class MainActivity : ComponentActivity() {
 
     private companion object {
         const val KEYS_ASSET = "keys.json"
+        const val PROGRESS_THROTTLE_MS = 500L
     }
 }

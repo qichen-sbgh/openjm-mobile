@@ -30,8 +30,10 @@ shared/                        # Kotlin Multiplatform：协议核心 + 数据 + 
       RootKeys.kt              # 根密钥 JSON 装载（只解析，不决定密钥从哪来）
     data/Book.kt               # 书架模型 + 内存仓库（Room KMP 待接入）
     ui/App.kt                  # 书架页
+    ui/BookReader.kt           # 阅读页：标题栏 + 分页渲染
     ui/PdfReaderCanvas.kt      # expect：平台 PDF 渲染桥
-  src/androidMain/…            # javax.crypto、ContentResolver 流、沙盒落盘（JmSandbox）、PDFium 占位
+  src/androidMain/…            # javax.crypto、ContentResolver 流、沙盒落盘（JmSandbox）、
+                               # PDFium 渲染（ui/PdfPageRenderer.kt）
   src/iosMain/…                # CommonCrypto、NSInputStream、PDFKit 占位、ComposeUIViewController
 androidApp/                    # Android 壳：QQ 唤起、SAF 兜底、私有沙盒
 iosApp/                        # Xcode 壳：自定义 UTI + onOpenURL
@@ -49,6 +51,7 @@ iosApp/                        # Xcode 壳：自定义 UTI + onOpenURL
 - 单遍流式导入：64KB 缓冲 + 尾部 32 字节滑动窗口，一遍同时算 HMAC 和解密；
 - 校验通过才落盘：明文先写 `tmp/{uuid}.tmp`，成功才原子改名成 `books/{doc_id}.{ext}`，失败删临时文件；
 - 书架 upsert：同一 `doc_id` 重复导入保留阅读进度，只刷新最近阅读时间；
+- 阅读页与 PDF 渲染桥：`BookReader` + `PdfReaderCanvas`（Android 侧接 PDFium 分页渲染，iOS 侧仍是占位）；
 - 长度恒等式校验、常量时间 MAC 比对、Meta 路径穿越过滤；
 - 三类错误与 UI 文案分开，不靠字符串匹配。
 
@@ -84,7 +87,7 @@ OPENJM_TESTVECTORS=../openjm/testvectors ./gradlew :shared:testAndroidHostTest
 ## 待办
 
 **共享层**
-- [x] 向量回放与落盘链路：`androidHostTest` 13 例（3 个向量回放 + 6 个沙盒落盘 + 4 个书架 upsert）
+- [x] 向量回放与落盘链路：`androidHostTest` 15 例（3 个向量回放 + 6 个沙盒落盘 + 6 个书架/进度）
 - [ ] CI 里回放真实向量（现在只有构建 + 编译门槛；向量仓私有，需要配一个只读 token）
 - [ ] Room KMP + KSP 接入，替换 `InMemoryBookRepository`
 - [ ] 导入进度回调（`Flow<ImportProgress>`），给 UI 显示百分比
@@ -92,10 +95,11 @@ OPENJM_TESTVECTORS=../openjm/testvectors ./gradlew :shared:testAndroidHostTest
 **Android**
 - [x] 后台线程完整导入：`filesDir/tmp/{uuid}.tmp` → 校验通过后 rename 到 `filesDir/books/{doc_id}.pdf`
       （书架仍是内存实现，重启 App 会清空 —— 等 Room 接入）
+- [x] PDFium 渲染：`io.legere:pdfiumandroid` + 纵向分页列表，一页一张 Bitmap，占位用首页比例
 - [ ] 口令弹窗：现在遇到口令文件只提示“需要口令”，不弹输入框
-- [ ] PDFium 接入（`AndroidView`）+ 首页封面渲染
+- [ ] 首页封面渲染（WebP，首帧静图）—— 格式已定，见 openjm `decisions.md` 待定项
 - [ ] `.jm.1` 等被 QQ 改名的情况：靠魔数判定，入口里已兼容
-- [ ] 阅读进度 500ms 防抖写入 + 退后台补写
+- [ ] 进度落库：现在只有 500ms 节流 + 退出补写的**内存**写入，重启即清空（等 Room）
 
 **iOS（⏸ 冻结，等 Android 稳定后启动，见 D10）**
 - [ ] `onOpenURL` 里补 security-scoped 访问与导入

@@ -45,6 +45,8 @@ kotlin {
         }
         androidMain.dependencies {
             implementation(libs.androidx.activity.compose)
+            // PDF 渲染：PDFium 预编译二进制，全链路不碰平台 PdfRenderer（D6，避开 ROM 字体与缩放问题）
+            implementation(libs.pdfiumandroid)
         }
         commonTest.dependencies {
             implementation(kotlin("test"))
