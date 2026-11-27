@@ -104,7 +104,7 @@ OPENJM_TESTVECTORS=../openjm/testvectors ./gradlew :shared:testAndroidHostTest
       （书架仍是内存实现，重启 App 会清空 —— 等 Room 接入）
 - [x] PDFium 渲染：`io.legere:pdfiumandroid` + 纵向分页列表，一页一张 Bitmap，占位用首页比例
 - [x] 首页封面：PDFium 渲染首帧 → WebP（质量 80）存 `covers/{doc_id}.webp`，书架行显示 48×64dp 缩略图
-- [ ] 口令弹窗：现在遇到口令文件只提示“需要口令”，不弹输入框
+- [x] 口令弹窗：口令文件弹出输入框重试，先验证再落盘，错口令不留任何文件
 - [ ] `.jm.1` 等被 QQ 改名的情况：靠魔数判定，入口里已兼容
 - [ ] 进度落库：现在只有 500ms 节流 + 退出补写的**内存**写入，重启即清空（等 Room）
 
