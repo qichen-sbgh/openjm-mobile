@@ -12,10 +12,11 @@ import androidx.compose.runtime.mutableStateOf
 import com.openjm.reader.crypto.JmError
 import com.openjm.reader.crypto.parseRootKeys
 import com.openjm.reader.data.Book
+import com.openjm.reader.data.BookRepository
 import com.openjm.reader.data.CoverStore
-import com.openjm.reader.data.InMemoryBookRepository
 import com.openjm.reader.data.JmSandbox
 import com.openjm.reader.data.JmSandboxImporter
+import com.openjm.reader.data.JsonBookRepository
 import com.openjm.reader.ui.App
 import com.openjm.reader.ui.BookReader
 import com.openjm.reader.ui.PdfPageRenderer
@@ -34,7 +35,7 @@ import java.util.concurrent.Executors
  */
 class MainActivity : ComponentActivity() {
 
-    private val repository = InMemoryBookRepository()
+    private lateinit var repository: BookRepository
     private val shelf = mutableStateOf<List<Book>>(emptyList())
     private val openBook = mutableStateOf<Book?>(null)
     private val worker = Executors.newSingleThreadExecutor()
@@ -63,6 +64,9 @@ class MainActivity : ComponentActivity() {
         sandbox = JmSandbox(filesDir)
         importer = JmSandboxImporter(sandbox, rootKeys)
         coverStore = CoverStore(sandbox)
+        // 书架落盘在私有目录的 books/index.json（已被沙盒目录结构覆盖，无需额外权限）
+        repository = JsonBookRepository(File(filesDir, "books/index.json"))
+        shelf.value = repository.recent()
 
         setContent {
             val book = openBook.value

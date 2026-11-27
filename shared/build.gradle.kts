@@ -5,6 +5,8 @@ plugins {
     alias(libs.plugins.androidMultiplatformLibrary)
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
+    // 书架持久化用 JSON 落盘（见 docs/tech/mobile.md §5），@Serializable 需要这个编译器插件
+    alias(libs.plugins.kotlinSerialization)
 }
 
 kotlin {
