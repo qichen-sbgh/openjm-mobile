@@ -72,7 +72,7 @@ export JAVA_HOME=/opt/homebrew/opt/openjdk@21   # macOS 本机路径
 
 **共享层**
 - [x] `androidHostTest`：回放 `openjm/testvectors`（3 个用例覆盖 12 个向量场景）
-- [ ] 把向量回放接进 CI（需要能拿到私有 openjm 仓的向量）
+- [ ] CI 里回放真实向量（现在只有构建 + 编译门槛；向量仓私有，需要配一个只读 token）
 - [ ] Room KMP + KSP 接入，替换 `InMemoryBookRepository`
 - [ ] 导入进度回调（`Flow<ImportProgress>`），给 UI 显示百分比
 
