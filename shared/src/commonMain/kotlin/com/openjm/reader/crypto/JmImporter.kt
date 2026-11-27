@@ -44,6 +44,7 @@ object JmImporter {
         val metaBuffer = ByteArray(header.metaLen)
         var metaOffset = 0
         var meta: JmMeta? = null
+        var metaError: JmError? = null
         var remainingPlain = -1L
 
         fun emit(plain: ByteArray, length: Int) {
@@ -57,10 +58,18 @@ object JmImporter {
                 remainingMeta -= take
                 offset += take
                 remaining -= take
-                if (remainingMeta == 0) {
-                    val parsed = parseJmMeta(metaBuffer.decodeToString())
-                    meta = parsed
-                    remainingPlain = parsed.size
+                if (remainingMeta == 0 && meta == null && metaError == null) {
+                    try {
+                        val parsed = parseJmMeta(metaBuffer.decodeToString())
+                        meta = parsed
+                        remainingPlain = parsed.size
+                    } catch (e: JmError) {
+                        // Meta 解不开（典型情况：口令错误）不能就地抛出，
+                        // 否则错误类型会随平台漂移：Python 先验 MAC 得 Auth，这里会先得 Format。
+                        // 记下来，等 MAC 验完再按“MAC 优先”决定抛哪个。
+                        metaError = e
+                        remainingPlain = 0L
+                    }
                 }
             }
 
@@ -115,7 +124,8 @@ object JmImporter {
             throw JmError.Auth()
         }
 
-        val parsed = meta ?: throw JmError.Format("缺少元数据段")
+        val parsed = meta
+            ?: throw (metaError ?: JmError.Format("缺少元数据段"))
         val claimed = JmProtocol.HEADER_SIZE +
             header.metaLen +
             parsed.size +

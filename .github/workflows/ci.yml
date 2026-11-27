@@ -1,0 +1,30 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  android:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: android-actions/setup-android@v3
+
+      # 只构建 Android；iOS 冻结在 M4 之前不参与 CI（见 openjm decisions D10）
+      # 向量仓是私有的，CI 里拿不到 → 回放用例自动 skip，构建与编译仍是硬门槛
+      - name: Build and test
+        run: ./gradlew :androidApp:assembleDebug :shared:testAndroidHostTest --console=plain
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: openjm-debug-apk
+          path: androidApp/build/outputs/apk/debug/*.apk
+          if-no-files-found: error

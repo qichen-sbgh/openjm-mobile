@@ -12,7 +12,7 @@
 >
 > | 平台 | 状态 |
 > | --- | --- |
-> | Android | `./gradlew :androidApp:assembleDebug` 已通过；协议核心尚未跑向量 |
+> | Android | `assembleDebug` 通过；11 个冻结向量在 `androidHostTest` 全过 |
 > | iOS | ⏸ 冻结：仅保留源码，等 Android 稳定后再对齐 |
 
 ## 结构
@@ -71,7 +71,8 @@ export JAVA_HOME=/opt/homebrew/opt/openjdk@21   # macOS 本机路径
 ## 待办
 
 **共享层**
-- [ ] `commonTest`：用 `openjm/testvectors` 回放（需要在 Gradle 里加测试源集与 kotlinx-coroutines-test）
+- [x] `androidHostTest`：回放 `openjm/testvectors`（3 个用例覆盖 12 个向量场景）
+- [ ] 把向量回放接进 CI（需要能拿到私有 openjm 仓的向量）
 - [ ] Room KMP + KSP 接入，替换 `InMemoryBookRepository`
 - [ ] 导入进度回调（`Flow<ImportProgress>`），给 UI 显示百分比
 

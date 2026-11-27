@@ -29,6 +29,9 @@ kotlin {
         androidResources {
             enable = true
         }
+
+        // 协议向量回放跑在 JVM host test 上：不需要真机，也能覆盖 androidMain 的 javax.crypto 实现。
+        withHostTestBuilder { }
     }
 
     sourceSets {
@@ -42,6 +45,9 @@ kotlin {
         }
         androidMain.dependencies {
             implementation(libs.androidx.activity.compose)
+        }
+        commonTest.dependencies {
+            implementation(kotlin("test"))
         }
     }
 }
