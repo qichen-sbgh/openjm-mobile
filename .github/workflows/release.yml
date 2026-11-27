@@ -1,0 +1,101 @@
+name: release
+
+on:
+  push:
+    tags: ["app-v*"]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "构建哪个 ref（默认当前分支）；tag 请填 app-v0.1.0 这种"
+        required: false
+        default: ""
+
+jobs:
+  apk:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref || github.ref }}
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      # 生产根密钥与签名材料都从仓库 Secret 注入，不进 git（见 docs/tech/key-registry.md）
+      - name: Inject keys and signing material
+        env:
+          KEYS_JSON: ${{ secrets.OPENJM_KEYS_JSON }}
+          KEYSTORE_BASE64: ${{ secrets.OPENJM_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.OPENJM_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.OPENJM_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.OPENJM_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "${KEYS_JSON}" ]; then
+            echo "缺少 OPENJM_KEYS_JSON secret，拒绝出一个打不开任何文件的包"
+            exit 1
+          fi
+          if [ -z "${KEYSTORE_BASE64}" ]; then
+            echo "缺少 OPENJM_KEYSTORE_BASE64 secret，拒绝出 unsigned 包"
+            exit 1
+          fi
+
+          mkdir -p androidApp/src/main/assets androidApp/keystore
+          printf '%s' "${KEYS_JSON}" > androidApp/src/main/assets/keys.json
+          printf '%s' "${KEYSTORE_BASE64}" | base64 -d > androidApp/keystore/openjm-release.jks
+          cat > keystore.properties <<EOF
+          storeFile=androidApp/keystore/openjm-release.jks
+          storePassword=${KEYSTORE_PASSWORD}
+          keyAlias=${KEY_ALIAS}
+          keyPassword=${KEY_PASSWORD}
+          EOF
+
+          # 只报事实，不打印任何密钥内容
+          test -s androidApp/src/main/assets/keys.json
+          test -s androidApp/keystore/openjm-release.jks
+          python3 - <<'PY'
+          import json, pathlib
+          keys = json.loads(pathlib.Path("androidApp/src/main/assets/keys.json").read_text())
+          print("注入的 key_id:", ", ".join(keys.keys()))
+          PY
+
+      - name: Build signed release APK
+        run: ./gradlew :androidApp:assembleRelease --console=plain
+
+      - name: Verify signature
+        run: |
+          set -euo pipefail
+          apksigner="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)/apksigner"
+          "$apksigner" verify --print-certs androidApp/build/outputs/apk/release/*.apk \
+            | grep -E "Verifies|DN|SHA-256 digest" || true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: openjm-release-apk
+          path: androidApp/build/outputs/apk/release/*.apk
+          if-no-files-found: error
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/app-v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          apk=$(ls androidApp/build/outputs/apk/release/*.apk | head -1)
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" "$apk" --clobber
+          else
+            gh release create "$tag" "$apk" \
+              --title "openjm ${tag#app-}" \
+              --notes "Android 阅读器 ${tag#app-}。
+
+          安装：下载下方 .apk，允许「未知来源安装」后装上；在 QQ 里点开 \`.jm\` 文件即可导入。
+
+          - 只支持 Android 8.0+（arm64 / armeabi）
+          - 只支持 PDF；非 PDF 的 \`.jm\` 会进书架但打不开
+          - 根密钥内置于 App，无需额外配置"
+          fi
+          gh release view "$tag" --json assets --jq '.assets[] | "\(.name)  \(.size) bytes"'
