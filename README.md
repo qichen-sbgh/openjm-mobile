@@ -37,6 +37,7 @@ shared/                        # Kotlin Multiplatform：协议核心 + 数据 + 
                                # 书架持久化（JsonBookRepository）、PDFium 渲染（ui/PdfPageRenderer.kt）
   src/iosMain/…                # CommonCrypto、NSInputStream、PDFKit 占位、ComposeUIViewController
 androidApp/                    # Android 壳：QQ 唤起、SAF 兜底、私有沙盒
+tools/emulator-e2e.ps1         # 模拟器上的端到端回归脚本（文本定位，不写死坐标）
 iosApp/                        # Xcode 壳：自定义 UTI + onOpenURL
 ```
 
@@ -82,6 +83,9 @@ OPENJM_TESTVECTORS=../openjm/testvectors ./gradlew :shared:testAndroidHostTest
 # 真机导入需要根密钥（不入库，.gitignore 已挡）：
 #   把 {"1":"<64 位 hex>"} 放到 androidApp/src/main/assets/keys.json，格式见 openjm 的 key-registry.md
 #   缺这个文件时 App 能起来，但导入前会提示“缺少根密钥”
+
+# 端到端回归（模拟器，一条命令跑完「空书架 → 导入 → 阅读 → 杀进程还原」）
+.\tools\emulator-e2e.ps1 -Fresh
 
 # iOS（⏸ 冻结）：等 Android 稳定后再用 Xcode 打开 iosApp/iosApp.xcodeproj
 ```
