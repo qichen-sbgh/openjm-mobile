@@ -17,20 +17,25 @@
     依赖：Android SDK（emulator / platform-tools）、JDK 21、已创建的 AVD；
     模拟器没起就自动起（无头），脚本结束默认留着（-StopEmulator 可关）。
 
-.PARAMETER Fresh
-    先卸载 App 再装，保证“冷启动空书架”这条断言有效。
+.PARAMETER KeepData
+    保留应用数据（不卸载）。默认会卸载重装，否则“冷启动空书架”这条断言不成立。
 
 .PARAMETER Vector
     要导入的 .jm，默认用总仓的 v01-plain-no-pad。
 
 .EXAMPLE
-    .\tools\emulator-e2e.ps1 -Fresh
+    .\tools\emulator-e2e.ps1
+
+.EXAMPLE
+    .\tools\emulator-e2e.ps1 -KeepData    # 跑“已有书架”的场景（跳过空书架断言）
 #>
 param(
     [string]$Avd = "openjm36",
     [string]$Vector = "",
     [string]$Package = "com.openjm.reader",
     [string]$Apk = "",
+    [switch]$KeepData,
+    # 兼容旧写法：默认就是卸载重装，-Fresh 等同于不带参数
     [switch]$Fresh,
     [switch]$NoBuild,
     [switch]$StopEmulator
@@ -164,9 +169,9 @@ if (-not $NoBuild) {
     } finally { Pop-Location }
     Write-Ok "assembleDebug 通过"
 }
-if ($Fresh) {
+if (-not $KeepData) {
     & $adb uninstall $Package 2>&1 | Out-Null
-    Write-Ok "已卸载旧包（冷启动空书架的前提）"
+    Write-Ok "已卸载旧包（保证冷启动是空书架；-KeepData 可保留数据）"
 }
 & $adb install -r $Apk 2>&1 | Out-Null
 if ($LASTEXITCODE -ne 0) { throw "安装失败：$Apk" }
@@ -175,7 +180,11 @@ Write-Ok "安装完成：$Apk"
 Write-Step "2) 冷启动：书架应为空"
 Start-App
 $texts = Get-UiTexts
-Assert-Contains "空书架文案" $texts "书架还是空的"
+if ($KeepData) {
+    Write-Host "  跳过空书架断言（-KeepData）" -ForegroundColor DarkGray
+} else {
+    Assert-Contains "空书架文案" $texts "书架还是空的"
+}
 
 Write-Step "3) VIEW 唤起 → 导入"
 & $adb push $Vector /data/local/tmp/e2e.jm 2>&1 | Out-Null
