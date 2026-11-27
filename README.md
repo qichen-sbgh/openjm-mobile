@@ -84,8 +84,8 @@ OPENJM_TESTVECTORS=../openjm/testvectors ./gradlew :shared:testAndroidHostTest
 #   把 {"1":"<64 位 hex>"} 放到 androidApp/src/main/assets/keys.json，格式见 openjm 的 key-registry.md
 #   缺这个文件时 App 能起来，但导入前会提示“缺少根密钥”
 
-# 端到端回归（模拟器，一条命令跑完「空书架 → 导入 → 阅读 → 杀进程还原」）
-#   默认会先卸载重装（否则「空书架」断言不成立）；-KeepData 保留数据
+# 端到端回归（模拟器，一条命令跑完「空书架 → 导入 → 阅读 → 杀进程还原 → 口令三条路径」）
+#   默认会先卸载重装（否则「空书架」断言不成立）；-KeepData 保留数据，-SkipPassword 跳口令步骤
 .\tools\emulator-e2e.ps1
 
 # iOS（⏸ 冻结）：等 Android 稳定后再用 Xcode 打开 iosApp/iosApp.xcodeproj
@@ -102,12 +102,12 @@ OPENJM_TESTVECTORS=../openjm/testvectors ./gradlew :shared:testAndroidHostTest
 
 **Android**
 - [x] 后台线程完整导入：`filesDir/tmp/{uuid}.tmp` → 校验通过后 rename 到 `filesDir/books/{doc_id}.pdf`
-      （书架仍是内存实现，重启 App 会清空 —— 等 Room 接入）
 - [x] PDFium 渲染：`io.legere:pdfiumandroid` + 纵向分页列表，一页一张 Bitmap，占位用首页比例
 - [x] 首页封面：PDFium 渲染首帧 → WebP（质量 80）存 `covers/{doc_id}.webp`，书架行显示 48×64dp 缩略图
 - [x] 口令弹窗：口令文件弹出输入框重试，先验证再落盘，错口令不留任何文件
+- [x] 进度落库：`books/index.json`（500ms 节流 + 退出补写），杀进程重进还原页码与页内偏移
+- [x] 发版瘦身：release 只打 arm64-v8a / armeabi-v7a（4 套 ABI 的 29MB → 16MB）
 - [ ] `.jm.1` 等被 QQ 改名的情况：靠魔数判定，入口里已兼容
-- [ ] 进度落库：现在只有 500ms 节流 + 退出补写的**内存**写入，重启即清空（等 Room）
 
 **iOS（⏸ 冻结，等 Android 稳定后启动，见 D10）**
 - [ ] `onOpenURL` 里补 security-scoped 访问与导入

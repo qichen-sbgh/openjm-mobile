@@ -37,6 +37,11 @@ param(
     [switch]$KeepData,
     # 兼容旧写法：默认就是卸载重装，-Fresh 等同于不带参数
     [switch]$Fresh,
+    # 口令文件回归：不传就自动找总仓的 v03-password.jm；-SkipPassword 可跳过
+    [string]$PasswordVector = "",
+    [string]$Password = "correct horse battery staple",
+    [string]$WrongPassword = "wrong horse battery staple",
+    [switch]$SkipPassword,
     [switch]$NoBuild,
     [switch]$StopEmulator
 )
@@ -222,6 +227,59 @@ Assert-Contains "冷启动后进度还在" $after "页"
 
 $index = & $adb shell run-as $Package cat files/books/index.json 2>&1
 if (($index -join "`n") -match '"docId"') { Write-Ok "books/index.json 已落盘" } else { Write-Fail "books/index.json 缺失或为空" }
+
+Write-Step "6) 口令文件：弹窗 / 错口令不落盘 / 对口令导入"
+if (-not $PasswordVector) {
+    $PasswordVector = Join-Path (Split-Path -Parent $repoRoot) "openjm\testvectors\valid\v03-password.jm"
+}
+if ($SkipPassword) {
+    Write-Host "  跳过（-SkipPassword）" -ForegroundColor DarkGray
+} elseif (-not (Test-Path $PasswordVector)) {
+    Write-Host "  跳过：找不到口令向量 $PasswordVector" -ForegroundColor DarkGray
+} else {
+    $booksBefore = (@(& $adb shell run-as $Package ls files/books 2>&1 | Where-Object { $_ -match "\.pdf" })).Count
+
+    Invoke-Adb -AdbArgs @("push", $PasswordVector, "/data/local/tmp/e2e-pwd.jm") | Out-Null
+    Invoke-Adb -AdbArgs @("shell", "run-as", $Package, "cp", "/data/local/tmp/e2e-pwd.jm", "files/e2e-pwd.jm") | Out-Null
+    Invoke-Adb -AdbArgs @("shell", "am", "force-stop", $Package) | Out-Null
+    Start-App "file:///data/data/$Package/files/e2e-pwd.jm"
+
+    $dialog = Get-UiTexts
+    Assert-Contains "弹出需要口令" $dialog "需要口令"
+
+    # 错口令：先点输入框，再输入，再点解锁
+    $edit = Find-Center "口令"
+    if (-not $edit) { Write-Fail "找不到口令输入框" } else {
+        & $adb shell input tap $edit[0] $edit[1] 2>&1 | Out-Null
+        Start-Sleep -Milliseconds 500
+        & $adb shell input text ($WrongPassword -replace " ", "%s") 2>&1 | Out-Null
+        Start-Sleep -Milliseconds 500
+        Tap-Text "解锁" | Out-Null
+        Start-Sleep -Seconds 4
+        $afterWrong = Get-UiTexts
+        Assert-Contains "错口令提示" $afterWrong "口令不对"
+        $booksAfterWrong = (@(& $adb shell run-as $Package ls files/books 2>&1 | Where-Object { $_ -match "\.pdf" })).Count
+        if ($booksAfterWrong -gt $booksBefore) { Write-Fail "错口令竟然落盘了新文件" } else { Write-Ok "错口令没有新增落盘文件" }
+    }
+
+    # 对口令：重来一次
+    Invoke-Adb -AdbArgs @("shell", "am", "force-stop", $Package) | Out-Null
+    Start-App "file:///data/data/$Package/files/e2e-pwd.jm"
+    $edit = Find-Center "口令"
+    if (-not $edit) { Write-Fail "第二次没找到口令输入框" } else {
+        & $adb shell input tap $edit[0] $edit[1] 2>&1 | Out-Null
+        Start-Sleep -Milliseconds 500
+        & $adb shell input text ($Password -replace " ", "%s") 2>&1 | Out-Null
+        Start-Sleep -Milliseconds 500
+        Tap-Text "解锁" | Out-Null
+        Start-Sleep -Seconds 6
+        $afterOk = Get-UiTexts
+        if (($afterOk -join "`n").Contains("需要口令")) { Write-Fail "口令正确但弹窗还在" } else { Write-Ok "口令正确后弹窗关闭" }
+        Assert-Contains "口令文件已进书架" $afterOk ".pdf"
+        $booksAfterOk = (@(& $adb shell run-as $Package ls files/books 2>&1 | Where-Object { $_ -match "\.pdf" })).Count
+        if ($booksAfterOk -ge $booksBefore) { Write-Ok "沙盒明文数量正常（$booksBefore → $booksAfterOk；v03 与 v01 同 doc_id，命中去重不新增文件）" } else { Write-Fail "对口令导入后明文变少了" }
+    }
+}
 
 # ---------------------------------------------------------------- 收尾
 if ($StopEmulator) { & $adb emu kill 2>&1 | Out-Null }
