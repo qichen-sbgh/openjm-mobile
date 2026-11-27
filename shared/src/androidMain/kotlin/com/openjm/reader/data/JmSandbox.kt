@@ -48,6 +48,12 @@ class JmSandbox(val root: File) {
     fun coverFile(docId: String): File = File(coversDir, "$docId.webp")
 
     fun relativeCoverPath(docId: String): String = "covers/$docId.webp"
+
+    /** 从书架删书时连正文与封面一起删——不然会留下永远打不开的孤儿文件。 */
+    fun deleteBook(docId: String, ext: String) {
+        bookFile(docId, ext).delete()
+        coverFile(docId).delete()
+    }
 }
 
 /**

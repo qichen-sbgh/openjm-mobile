@@ -29,7 +29,7 @@ fun BookReader(
     onDocumentLoaded: (totalPages: Int) -> Unit,
     onProgress: (page: Int, scrollRatio: Float) -> Unit,
 ) {
-    MaterialTheme {
+    OpenjmTheme {
         Scaffold(
             topBar = {
                 TopAppBar(

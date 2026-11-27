@@ -22,6 +22,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -36,6 +37,7 @@ import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
@@ -60,6 +62,7 @@ actual fun PdfReaderCanvas(
 ) {
     val context = LocalContext.current
     val renderer = remember(filePath) { PdfPageRenderer(File(filePath)) }
+    val scope = rememberCoroutineScope()
     var pageCount by remember(filePath) { mutableStateOf(0) }
     var pageRatio by remember(filePath) { mutableStateOf(DEFAULT_RATIO) }
     var error by remember(filePath) { mutableStateOf<String?>(null) }
@@ -121,16 +124,27 @@ actual fun PdfReaderCanvas(
                 }.collect { (page, ratio) -> onProgressChanged(page, ratio) }
             }
 
-            LazyColumn(state = listState, modifier = modifier.fillMaxSize()) {
-                items(pageCount) { index ->
-                    PdfPageItem(
-                        renderer = renderer,
-                        index = index,
-                        placeholderRatio = pageRatio,
-                        modifier = Modifier.fillMaxWidth(),
-                        onMeasured = { height -> heights[index] = height },
-                    )
+            Box(modifier = modifier.fillMaxSize()) {
+                LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
+                    items(pageCount) { index ->
+                        PdfPageItem(
+                            renderer = renderer,
+                            index = index,
+                            placeholderRatio = pageRatio,
+                            modifier = Modifier.fillMaxWidth(),
+                            onMeasured = { height -> heights[index] = height },
+                        )
+                    }
                 }
+
+                PageJumpBar(
+                    page = listState.firstVisibleItemIndex,
+                    pageCount = pageCount,
+                    onSeek = { target -> scope.launch { listState.scrollToItem(target) } },
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 24.dp),
+                )
             }
         }
     }

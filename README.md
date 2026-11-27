@@ -132,6 +132,9 @@ keyPassword=…
 - [x] 进度落库：`books/index.json`（500ms 节流 + 退出补写），杀进程重进还原页码与页内偏移
 - [x] 发版瘦身：release 只打 arm64-v8a / armeabi-v7a（4 套 ABI 的 29MB → 16MB）
 - [x] 发版签名：`keystore.properties` + JKS（均不入库），`assembleRelease` 直出可安装包
+- [x] 书架管理：长按条目改书名 / 删书（正文与封面一起删）
+- [x] 阅读跳页：底部页码条「2/3 + 滑块」，几百页的书不用一路滑
+- [x] 深色模式：跟随系统（PDF 本身不反色，只换外壳）
 - [ ] `.jm.1` 等被 QQ 改名的情况：靠魔数判定，入口里已兼容
 
 **iOS（⏸ 冻结，等 Android 稳定后启动，见 D10）**

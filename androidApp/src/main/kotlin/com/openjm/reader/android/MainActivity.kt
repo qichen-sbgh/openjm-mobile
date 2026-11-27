@@ -94,6 +94,21 @@ class MainActivity : ComponentActivity() {
                             readerTotalPages = opened.totalPages
                             openBook.value = opened
                         },
+                        onRename = { renamed, title ->
+                            repository.rename(renamed.docId, title)
+                            shelf.value = repository.recent()
+                        },
+                        onDelete = { removed ->
+                            // 正文与封面一起删；文件 IO 放后台，别堵主线程
+                            worker.execute {
+                                sandbox.deleteBook(removed.docId, removed.ext)
+                                repository.delete(removed.docId)
+                                runOnUiThread {
+                                    shelf.value = repository.recent()
+                                    toast("已删除：${removed.title}")
+                                }
+                            }
+                        },
                     )
                 } else {
                     BookReader(
