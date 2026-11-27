@@ -123,15 +123,7 @@ class JmConformanceTest {
         MessageDigest.getInstance("SHA-256").digest(bytes)
             .joinToString("") { "%02x".format(it.toInt() and 0xFF) }
 
-    private fun locateVectors(): File? {
-        val candidates = listOfNotNull(
-            System.getenv("OPENJM_TESTVECTORS")?.let(::File),
-            File("../../openjm/testvectors"),
-            File("../openjm/testvectors"),
-            File("testvectors"),
-        )
-        return candidates.firstOrNull { File(it, "manifest.json").isFile }
-    }
+    private fun locateVectors(): File? = Vectors.dir
 
     private fun skip() {
         println("SKIP: 未找到 testvectors，设置 OPENJM_TESTVECTORS 后重跑")
