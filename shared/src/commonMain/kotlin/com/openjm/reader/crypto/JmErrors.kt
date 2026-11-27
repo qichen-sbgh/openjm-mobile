@@ -3,7 +3,7 @@ package com.openjm.reader.crypto
 /**
  * `.jm` 的三类失败场景，UI 文案直接按类型映射，不做字符串匹配。
  *
- * 与协议 `docs/protocol-v1.md` §6 一一对应。
+ * 与协议 `docs/tech/protocol.md` §6 一一对应。
  */
 sealed class JmError(message: String) : Exception(message) {
 

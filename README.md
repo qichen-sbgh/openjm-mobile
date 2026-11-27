@@ -82,8 +82,8 @@ iosApp/                        # Xcode 壳：自定义 UTI + onOpenURL
 
 | 依赖 | 来源 | 说明 |
 | --- | --- | --- |
-| 协议语义 | `openjm/docs/protocol-v1.md` | 冻结，任何改动先改协议 |
+| 协议语义 | `openjm/docs/tech/protocol.md` | 冻结，任何改动先改协议 |
 | 测试向量 | `openjm/testvectors/` | 11 个样本，三端必须一致 |
 | 测试根密钥 | `openjm/testvectors/keys.test.json` | `key_id=254`，只进测试 source set |
 
-生产根密钥不放任何仓库，见 `openjm/docs/key-registry.md`。
+生产根密钥不放任何仓库，见 `openjm/docs/tech/key-registry.md`。

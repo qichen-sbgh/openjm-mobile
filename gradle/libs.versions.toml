@@ -5,13 +5,15 @@ android-minSdk = "26"
 android-targetSdk = "37"
 androidx-activity = "1.13.0"
 compose-multiplatform = "1.11.1"
+# material3 独立版本线，跟 CMP 主版本不齐：插件 1.11.1 里 composeMaterial3Version 就是 1.9.0
+compose-material3 = "1.9.0"
 kotlin = "2.4.10"
 kotlinx-serialization = "1.13.0"
 
 [libraries]
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "androidx-activity" }
 compose-foundation = { module = "org.jetbrains.compose.foundation:foundation", version.ref = "compose-multiplatform" }
-compose-material3 = { module = "org.jetbrains.compose.material3:material3", version.ref = "compose-multiplatform" }
+compose-material3 = { module = "org.jetbrains.compose.material3:material3", version.ref = "compose-material3" }
 compose-runtime = { module = "org.jetbrains.compose.runtime:runtime", version.ref = "compose-multiplatform" }
 compose-ui = { module = "org.jetbrains.compose.ui:ui", version.ref = "compose-multiplatform" }
 compose-uiToolingPreview = { module = "org.jetbrains.compose.ui:ui-tooling-preview", version.ref = "compose-multiplatform" }

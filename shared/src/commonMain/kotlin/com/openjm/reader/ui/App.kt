@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -26,6 +27,8 @@ import com.openjm.reader.data.Book
  *
  * 封面缩略图、口令弹窗、导入进度条都还没接，见 README 的 TODO。
  */
+// material3 1.9.0 里 TopAppBar 还没转正，用稳定版就得显式 opt-in
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun App(
     books: List<Book>,

@@ -1,7 +1,7 @@
 package com.openjm.reader.data
 
 /**
- * 书架条目。字段与 `docs/protocol-v1.md` 的 Meta 对齐，
+ * 书架条目。字段与 `docs/tech/protocol.md` 的 Meta 对齐，
  * 主键用加密容器里的 `doc_id`——同一个文件从不同群重复发来也能命中同一条。
  */
 data class Book(
