@@ -119,7 +119,7 @@ keyPassword=…
 - [x] 向量回放与落盘链路：`androidHostTest` 20 例（3 向量回放 + 6 沙盒落盘 + 11 书架/进度/持久化）
 - [x] 书架持久化：JSON 落盘 `books/index.json`（原子写），`BookRepository` 接口不变
       —— 暂不引 Room KMP + KSP，理由与替换成本见 openjm `docs/tech/mobile.md` §5
-- [ ] CI 里回放真实向量（现在只有构建 + 编译门槛；向量仓私有，需要配一个只读 token）
+- [x] CI 里回放真实向量：总仓公开后 CI 匿名检出 `qichen-sbgh/openjm`，设 `OPENJM_TESTVECTORS` 后回放不再 skip
 - [ ] 导入进度回调（`Flow<ImportProgress>`），给 UI 显示百分比
 
 **Android**

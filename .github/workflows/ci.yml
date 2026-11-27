@@ -22,9 +22,25 @@ jobs:
           echo "ANDROID_HOME=$ANDROID_HOME"
           ls "$ANDROID_HOME/platforms" || true
 
+      # openjm 总仓已公开，冻结向量可以匿名拉；之前这几个回放用例在 CI 里一直是 skip 的
+      - name: Checkout test vectors
+        uses: actions/checkout@v4
+        with:
+          repository: qichen-sbgh/openjm
+          path: openjm
+
+      # 防呆：向量没拉到时明确失败，不要退回"静默 skip"
+      - name: Verify vectors present
+        run: |
+          set -e
+          test -f "$PWD/openjm/testvectors/manifest.json"
+          ls "$PWD/openjm/testvectors/valid" | head
+          echo "vectors OK"
+
       # 只构建 Android；iOS 冻结在 M4 之前不参与 CI（见 openjm decisions D10）
-      # 向量仓是私有的，CI 里拿不到 → 回放用例自动 skip，构建与编译仍是硬门槛
       - name: Build and test
+        env:
+          OPENJM_TESTVECTORS: ${{ github.workspace }}/openjm/testvectors
         run: ./gradlew :androidApp:assembleDebug :shared:testAndroidHostTest --console=plain
 
       - uses: actions/upload-artifact@v4
