@@ -27,10 +27,11 @@ shared/                        # Kotlin Multiplatform：协议核心 + 数据 + 
       JmMeta.kt                # 加密 Meta 解析 + 字段校验
       JmImporter.kt            # 单遍流式校验 + 解密（尾部 32B 留一手）
       JmErrors.kt              # Format / PasswordRequired / Auth
+      RootKeys.kt              # 根密钥 JSON 装载（只解析，不决定密钥从哪来）
     data/Book.kt               # 书架模型 + 内存仓库（Room KMP 待接入）
     ui/App.kt                  # 书架页
     ui/PdfReaderCanvas.kt      # expect：平台 PDF 渲染桥
-  src/androidMain/…            # javax.crypto、ContentResolver 流、PDFium 占位
+  src/androidMain/…            # javax.crypto、ContentResolver 流、沙盒落盘（JmSandbox）、PDFium 占位
   src/iosMain/…                # CommonCrypto、NSInputStream、PDFKit 占位、ComposeUIViewController
 androidApp/                    # Android 壳：QQ 唤起、SAF 兜底、私有沙盒
 iosApp/                        # Xcode 壳：自定义 UTI + onOpenURL
@@ -46,6 +47,8 @@ iosApp/                        # Xcode 壳：自定义 UTI + onOpenURL
 - HKDF-SHA256 派生：`PRK = HMAC(nonce, IKM)` 这个“salt 是 nonce”的反常点已按协议写死；
 - 口令模式：PBKDF2-HMAC-SHA256 10 万次，`key_id` 恒为 0；
 - 单遍流式导入：64KB 缓冲 + 尾部 32 字节滑动窗口，一遍同时算 HMAC 和解密；
+- 校验通过才落盘：明文先写 `tmp/{uuid}.tmp`，成功才原子改名成 `books/{doc_id}.{ext}`，失败删临时文件；
+- 书架 upsert：同一 `doc_id` 重复导入保留阅读进度，只刷新最近阅读时间；
 - 长度恒等式校验、常量时间 MAC 比对、Meta 路径穿越过滤；
 - 三类错误与 UI 文案分开，不靠字符串匹配。
 
@@ -61,9 +64,19 @@ iosApp/                        # Xcode 壳：自定义 UTI + onOpenURL
 
 ```bash
 # Android（当前唯一目标平台）：无需 Android Studio，JDK 21 + Android SDK 即可
-export JAVA_HOME=/opt/homebrew/opt/openjdk@21   # macOS 本机路径
-./gradlew :androidApp:assembleDebug
+export JAVA_HOME=/opt/homebrew/opt/openjdk@21        # macOS 本机路径
+$env:JAVA_HOME = "C:\path\to\jdk-21"                 # Windows PowerShell
+
+./gradlew :androidApp:assembleDebug                  # Windows 用 .\gradlew.bat
 # 产物：androidApp/build/outputs/apk/debug/androidApp-debug.apk
+
+# 回放协议向量（指不到 testvectors 时这几个用例会自动 skip，不会因此变红）
+OPENJM_TESTVECTORS=../openjm/testvectors ./gradlew :shared:testAndroidHostTest
+#   Windows: $env:OPENJM_TESTVECTORS="..\openjm\testvectors"; .\gradlew.bat :shared:testAndroidHostTest
+
+# 真机导入需要根密钥（不入库，.gitignore 已挡）：
+#   把 {"1":"<64 位 hex>"} 放到 androidApp/src/main/assets/keys.json，格式见 openjm 的 key-registry.md
+#   缺这个文件时 App 能起来，但导入前会提示“缺少根密钥”
 
 # iOS（⏸ 冻结）：等 Android 稳定后再用 Xcode 打开 iosApp/iosApp.xcodeproj
 ```
@@ -71,13 +84,15 @@ export JAVA_HOME=/opt/homebrew/opt/openjdk@21   # macOS 本机路径
 ## 待办
 
 **共享层**
-- [x] `androidHostTest`：回放 `openjm/testvectors`（3 个用例覆盖 12 个向量场景）
+- [x] 向量回放与落盘链路：`androidHostTest` 13 例（3 个向量回放 + 6 个沙盒落盘 + 4 个书架 upsert）
 - [ ] CI 里回放真实向量（现在只有构建 + 编译门槛；向量仓私有，需要配一个只读 token）
 - [ ] Room KMP + KSP 接入，替换 `InMemoryBookRepository`
 - [ ] 导入进度回调（`Flow<ImportProgress>`），给 UI 显示百分比
 
 **Android**
-- [ ] 后台线程完整导入：`filesDir/tmp/{uuid}.tmp` → 校验通过后 rename 到 `filesDir/books/{doc_id}.pdf`
+- [x] 后台线程完整导入：`filesDir/tmp/{uuid}.tmp` → 校验通过后 rename 到 `filesDir/books/{doc_id}.pdf`
+      （书架仍是内存实现，重启 App 会清空 —— 等 Room 接入）
+- [ ] 口令弹窗：现在遇到口令文件只提示“需要口令”，不弹输入框
 - [ ] PDFium 接入（`AndroidView`）+ 首页封面渲染
 - [ ] `.jm.1` 等被 QQ 改名的情况：靠魔数判定，入口里已兼容
 - [ ] 阅读进度 500ms 防抖写入 + 退后台补写
