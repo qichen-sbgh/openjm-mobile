@@ -6,7 +6,14 @@
 
 协议与跨端测试向量在 [`openjm`](https://github.com/qichen-sbgh/openjm) 仓库，本仓只实现消费端，不改协议。
 
-> **状态：骨架**。共享模块的协议核心已经写完，Android/iOS 的加密原语也已落代码，但**本仓库尚未在任何机器上编译通过**——生成它的环境没有 JDK 与 Xcode。第一次用 Android Studio / Xcode 打开时，请按下面的清单逐项过。
+> **状态：Android 在开发，iOS 冻结。**
+>
+> 平台优先级由 [`openjm` 的 D10 决策](https://github.com/qichen-sbgh/openjm/blob/main/docs/tech/decisions.md) 定：先把 Android 跑到稳定，iOS 代码保留在仓库但**不编译、不验证、不作为发版门槛**。
+>
+> | 平台 | 状态 |
+> | --- | --- |
+> | Android | `./gradlew :androidApp:assembleDebug` 已通过；协议核心尚未跑向量 |
+> | iOS | ⏸ 冻结：仅保留源码，等 Android 稳定后再对齐 |
 
 ## 结构
 
@@ -53,11 +60,12 @@ iosApp/                        # Xcode 壳：自定义 UTI + onOpenURL
 ## 跑起来
 
 ```bash
-# Android：直接用 Android Studio 打开仓库根目录，等 Gradle 同步
+# Android（当前唯一目标平台）：无需 Android Studio，JDK 21 + Android SDK 即可
+export JAVA_HOME=/opt/homebrew/opt/openjdk@21   # macOS 本机路径
 ./gradlew :androidApp:assembleDebug
+# 产物：androidApp/build/outputs/apk/debug/androidApp-debug.apk
 
-# iOS：Xcode 打开 iosApp/iosApp.xcodeproj
-# 首次需在 Configuration/Config.xcconfig 里填 TEAM_ID
+# iOS（⏸ 冻结）：等 Android 稳定后再用 Xcode 打开 iosApp/iosApp.xcodeproj
 ```
 
 ## 待办
@@ -73,10 +81,11 @@ iosApp/                        # Xcode 壳：自定义 UTI + onOpenURL
 - [ ] `.jm.1` 等被 QQ 改名的情况：靠魔数判定，入口里已兼容
 - [ ] 阅读进度 500ms 防抖写入 + 退后台补写
 
-**iOS**
+**iOS（⏸ 冻结，等 Android 稳定后启动，见 D10）**
 - [ ] `onOpenURL` 里补 security-scoped 访问与导入
 - [ ] `PDFKit` 接入（`UIKitView`）+ 封面缩略图
 - [ ] Info.plist 的 UTI 已经写了，需真机验证 QQ 是否出现在“用其他应用打开”列表
+- [ ] `platform.CoreCrypto` 的 cinterop 类型校对（从未编译过）
 
 ## 与其他两仓的关系
 
