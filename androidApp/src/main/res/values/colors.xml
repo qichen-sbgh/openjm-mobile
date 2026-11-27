@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 与 App 里 Compose 主题的主色一致，避免图标和界面像两个产品 -->
+    <color name="ic_launcher_background">#3F3D75</color>
+</resources>

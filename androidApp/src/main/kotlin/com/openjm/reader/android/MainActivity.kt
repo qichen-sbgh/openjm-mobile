@@ -4,11 +4,16 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.os.SystemClock
+import android.provider.OpenableColumns
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import com.openjm.reader.crypto.JmError
 import com.openjm.reader.crypto.parseRootKeys
 import com.openjm.reader.data.Book
@@ -19,6 +24,7 @@ import com.openjm.reader.data.JmSandboxImporter
 import com.openjm.reader.data.JsonBookRepository
 import com.openjm.reader.ui.App
 import com.openjm.reader.ui.BookReader
+import com.openjm.reader.ui.ImportProgressBar
 import com.openjm.reader.ui.PasswordPrompt
 import com.openjm.reader.ui.PdfPageRenderer
 import java.io.File
@@ -43,6 +49,9 @@ class MainActivity : ComponentActivity() {
     /** 正在等口令的文件；非空时弹输入框（FR-04）。 */
     private val passwordPromptUri = mutableStateOf<Uri?>(null)
     private val passwordError = mutableStateOf<String?>(null)
+
+    /** 导入进度：null = 没在导入；< 0 = 总大小未知（不确定进度条）；否则 0..1。 */
+    private val importProgress = mutableStateOf<Float?>(null)
     private val worker = Executors.newSingleThreadExecutor()
 
     private lateinit var importer: JmSandboxImporter
@@ -74,27 +83,34 @@ class MainActivity : ComponentActivity() {
         shelf.value = repository.recent()
 
         setContent {
-            val book = openBook.value
-            if (book == null) {
-                App(
-                    books = shelf.value,
-                    coverBaseDir = filesDir.absolutePath,
-                    onImport = { pickJm.launch(arrayOf("*/*")) },
-                    onOpen = { opened ->
-                        readerTotalPages = opened.totalPages
-                        openBook.value = opened
-                    },
-                )
-            } else {
-                BookReader(
-                    book = book,
-                    filePath = File(filesDir, book.localPath).absolutePath,
-                    onBack = {
-                        flushProgress()
-                        openBook.value = null
-                    },
-                    onDocumentLoaded = { pages -> readerTotalPages = pages },
-                    onProgress = ::onReaderProgress,
+            Box(modifier = Modifier.fillMaxSize()) {
+                val book = openBook.value
+                if (book == null) {
+                    App(
+                        books = shelf.value,
+                        coverBaseDir = filesDir.absolutePath,
+                        onImport = { pickJm.launch(arrayOf("*/*")) },
+                        onOpen = { opened ->
+                            readerTotalPages = opened.totalPages
+                            openBook.value = opened
+                        },
+                    )
+                } else {
+                    BookReader(
+                        book = book,
+                        filePath = File(filesDir, book.localPath).absolutePath,
+                        onBack = {
+                            flushProgress()
+                            openBook.value = null
+                        },
+                        onDocumentLoaded = { pages -> readerTotalPages = pages },
+                        onProgress = ::onReaderProgress,
+                    )
+                }
+
+                ImportProgressBar(
+                    progress = importProgress.value,
+                    modifier = Modifier.align(Alignment.BottomCenter),
                 )
             }
 
@@ -165,10 +181,24 @@ class MainActivity : ComponentActivity() {
             return
         }
         worker.execute {
+            importProgress.value = -1f
+            var lastPercent = -1
             try {
                 val stream = contentResolver.openInputStream(uri)
                     ?: throw IOException("文件已失效，请在 QQ 重新下载")
-                val imported = stream.use { importer.import(it, password) }
+                val totalBytes = queryTotalBytes(uri)
+                val imported = stream.use {
+                    importer.import(it, password) { read ->
+                        // 只在百分比变化时写 state，避免每 64KB 就触发一次重组
+                        if (totalBytes != null && totalBytes > 0) {
+                            val percent = (read * 100 / totalBytes).toInt()
+                            if (percent != lastPercent) {
+                                lastPercent = percent
+                                importProgress.value = percent / 100f
+                            }
+                        }
+                    }
+                }
                 // 封面失败不影响导入：书先进书架，缩略图退回占位块。
                 val coverPath = buildCover(imported)
                 val book = if (coverPath != null) imported.copy(coverPath = coverPath) else imported
@@ -196,8 +226,24 @@ class MainActivity : ComponentActivity() {
                 toastOnUi(e.message ?: "无法打开这个文件")
             } catch (e: Exception) {
                 toastOnUi(e.message ?: "导入失败")
+            } finally {
+                importProgress.value = null
             }
         }
+    }
+
+    /** 拿 URI 对应文件的声明大小；`content://` 不给 SIZE、`file://` 走文件长度，都没有就返回 null。 */
+    private fun queryTotalBytes(uri: Uri): Long? {
+        val fromProvider = runCatching {
+            contentResolver.query(uri, arrayOf(OpenableColumns.SIZE), null, null, null)?.use { cursor ->
+                if (cursor.moveToFirst() && !cursor.isNull(0)) cursor.getLong(0) else null
+            }
+        }.getOrNull()
+        if (fromProvider != null && fromProvider > 0) return fromProvider
+
+        return runCatching {
+            if (uri.scheme == "file") File(uri.path!!).length().takeIf { it > 0 } else null
+        }.getOrNull()
     }
 
     /**
