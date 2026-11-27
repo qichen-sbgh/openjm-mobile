@@ -1,9 +1,15 @@
 package com.openjm.reader.data
 
+import kotlinx.serialization.Serializable
+
 /**
  * 书架条目。字段与 `docs/tech/protocol.md` 的 Meta 对齐，
  * 主键用加密容器里的 `doc_id`——同一个文件从不同群重复发来也能命中同一条。
+ *
+ * `@Serializable` 是为了 JSON 落盘（见 `tech/mobile.md` §5）；字段只增不改名，
+ * 旧版本 App 读到新字段会忽略（`ignoreUnknownKeys`），新版本读到旧文件缺字段走默认值。
  */
+@Serializable
 data class Book(
     val docId: String,
     val title: String,
@@ -19,8 +25,8 @@ data class Book(
 )
 
 /**
- * 书架仓库。首版只有内存实现：Room KMP 与 KSP 的接入留到下一步，
- * 先把协议链路和 UI 骨架跑通，避免构建配置和加密核心同时变动。
+ * 书架仓库。实现有两份：内存版（测试用）与 JSON 落盘版（Android 用）。
+ * 换 Room / SQLDelight 时只需要再写一个实现，调用方不动。
  */
 interface BookRepository {
     /** 返回 true 表示新增；false 表示已存在（保留原阅读进度，只刷新 lastReadAt）。 */
@@ -37,6 +43,24 @@ interface BookRepository {
     fun delete(docId: String)
 }
 
+/**
+ * 重复导入的合并规则：**用户可见的元信息与阅读进度以已有条目为准**，
+ * 只刷新与新文件相关的字段。这条规则两个实现共用，避免各写一遍慢慢跑偏。
+ */
+internal fun Book.mergedWith(incoming: Book): Book = copy(
+    title = title,
+    localPath = incoming.localPath,
+    fileSize = incoming.fileSize,
+    lastReadAt = incoming.lastReadAt,
+)
+
+internal fun Book.withProgress(lastPage: Int, scrollRatio: Float, totalPages: Int): Book = copy(
+    lastPage = lastPage.coerceAtLeast(0),
+    scrollRatio = scrollRatio.coerceIn(0f, 1f),
+    totalPages = if (totalPages > 0) totalPages else this.totalPages,
+    lastReadAt = System.currentTimeMillis(),
+)
+
 class InMemoryBookRepository(initial: List<Book> = emptyList()) : BookRepository {
     private val books = LinkedHashMap<String, Book>().apply {
         initial.forEach { put(it.docId, it) }
@@ -44,17 +68,7 @@ class InMemoryBookRepository(initial: List<Book> = emptyList()) : BookRepository
 
     override fun upsert(book: Book): Boolean {
         val existing = books[book.docId]
-        val merged = if (existing == null) {
-            book
-        } else {
-            existing.copy(
-                title = existing.title,
-                localPath = book.localPath,
-                fileSize = book.fileSize,
-                lastReadAt = book.lastReadAt,
-            )
-        }
-        books[book.docId] = merged
+        books[book.docId] = existing?.mergedWith(book) ?: book
         return existing == null
     }
 
@@ -62,12 +76,7 @@ class InMemoryBookRepository(initial: List<Book> = emptyList()) : BookRepository
 
     override fun updateProgress(docId: String, lastPage: Int, scrollRatio: Float, totalPages: Int) {
         val existing = books[docId] ?: return
-        books[docId] = existing.copy(
-            lastPage = lastPage.coerceAtLeast(0),
-            scrollRatio = scrollRatio.coerceIn(0f, 1f),
-            totalPages = if (totalPages > 0) totalPages else existing.totalPages,
-            lastReadAt = System.currentTimeMillis(),
-        )
+        books[docId] = existing.withProgress(lastPage, scrollRatio, totalPages)
     }
 
     override fun delete(docId: String) {

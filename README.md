@@ -34,7 +34,7 @@ shared/                        # Kotlin Multiplatform：协议核心 + 数据 + 
     ui/BookReader.kt           # 阅读页：标题栏 + 分页渲染
     ui/PdfReaderCanvas.kt      # expect：平台 PDF 渲染桥
   src/androidMain/…            # javax.crypto、ContentResolver 流、沙盒落盘（JmSandbox / CoverStore）、
-                               # PDFium 渲染（ui/PdfPageRenderer.kt）
+                               # 书架持久化（JsonBookRepository）、PDFium 渲染（ui/PdfPageRenderer.kt）
   src/iosMain/…                # CommonCrypto、NSInputStream、PDFKit 占位、ComposeUIViewController
 androidApp/                    # Android 壳：QQ 唤起、SAF 兜底、私有沙盒
 iosApp/                        # Xcode 壳：自定义 UTI + onOpenURL
@@ -89,9 +89,10 @@ OPENJM_TESTVECTORS=../openjm/testvectors ./gradlew :shared:testAndroidHostTest
 ## 待办
 
 **共享层**
-- [x] 向量回放与落盘链路：`androidHostTest` 15 例（3 个向量回放 + 6 个沙盒落盘 + 6 个书架/进度）
+- [x] 向量回放与落盘链路：`androidHostTest` 20 例（3 向量回放 + 6 沙盒落盘 + 11 书架/进度/持久化）
+- [x] 书架持久化：JSON 落盘 `books/index.json`（原子写），`BookRepository` 接口不变
+      —— 暂不引 Room KMP + KSP，理由与替换成本见 openjm `docs/tech/mobile.md` §5
 - [ ] CI 里回放真实向量（现在只有构建 + 编译门槛；向量仓私有，需要配一个只读 token）
-- [ ] Room KMP + KSP 接入，替换 `InMemoryBookRepository`
 - [ ] 导入进度回调（`Flow<ImportProgress>`），给 UI 显示百分比
 
 **Android**
