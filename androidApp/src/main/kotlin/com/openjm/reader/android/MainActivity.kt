@@ -19,6 +19,7 @@ import com.openjm.reader.data.JmSandboxImporter
 import com.openjm.reader.data.JsonBookRepository
 import com.openjm.reader.ui.App
 import com.openjm.reader.ui.BookReader
+import com.openjm.reader.ui.PasswordPrompt
 import com.openjm.reader.ui.PdfPageRenderer
 import java.io.File
 import java.io.IOException
@@ -38,6 +39,10 @@ class MainActivity : ComponentActivity() {
     private lateinit var repository: BookRepository
     private val shelf = mutableStateOf<List<Book>>(emptyList())
     private val openBook = mutableStateOf<Book?>(null)
+
+    /** 正在等口令的文件；非空时弹输入框（FR-04）。 */
+    private val passwordPromptUri = mutableStateOf<Uri?>(null)
+    private val passwordError = mutableStateOf<String?>(null)
     private val worker = Executors.newSingleThreadExecutor()
 
     private lateinit var importer: JmSandboxImporter
@@ -92,6 +97,18 @@ class MainActivity : ComponentActivity() {
                     onProgress = ::onReaderProgress,
                 )
             }
+
+            val promptUri = passwordPromptUri.value
+            if (promptUri != null) {
+                PasswordPrompt(
+                    onDismiss = {
+                        passwordPromptUri.value = null
+                        passwordError.value = null
+                    },
+                    onSubmit = { entered -> importFrom(promptUri, entered) },
+                    errorMessage = passwordError.value,
+                )
+            }
         }
 
         when (intent?.action) {
@@ -142,7 +159,7 @@ class MainActivity : ComponentActivity() {
      * 后台单遍导入。错误按 [JmError] 的类型分文案，不做字符串匹配：
      * 格式不对 / 需要口令 / 不完整或损坏，三种提示见 `docs/tech/protocol.md` §7。
      */
-    private fun importFrom(uri: Uri) {
+    private fun importFrom(uri: Uri, password: String? = null) {
         if (!hasRootKeys) {
             toast("缺少根密钥：把 keys.json 放进 androidApp/src/main/assets/")
             return
@@ -151,18 +168,30 @@ class MainActivity : ComponentActivity() {
             try {
                 val stream = contentResolver.openInputStream(uri)
                     ?: throw IOException("文件已失效，请在 QQ 重新下载")
-                val imported = stream.use { importer.import(it) }
+                val imported = stream.use { importer.import(it, password) }
                 // 封面失败不影响导入：书先进书架，缩略图退回占位块。
                 val coverPath = buildCover(imported)
                 val book = if (coverPath != null) imported.copy(coverPath = coverPath) else imported
                 val isNew = repository.upsert(book)
                 runOnUiThread {
+                    passwordPromptUri.value = null
+                    passwordError.value = null
                     shelf.value = repository.recent()
                     toast(if (isNew) "已导入：${book.title}" else "已更新：${book.title}（阅读进度保留）")
                 }
             } catch (e: JmError.PasswordRequired) {
-                // 口令弹窗属于 M2 后续：现在只把“它需要口令”这件事说清楚。
-                toastOnUi("这份文档需要口令，口令输入还没接")
+                // 口令文件：不报错，弹输入框重试（FR-04）。
+                runOnUiThread {
+                    passwordError.value = null
+                    passwordPromptUri.value = uri
+                }
+            } catch (e: JmError.Auth) {
+                // 口令错与文件损坏在协议层不可区分（D2），文案不猜是哪一种。
+                if (password != null) {
+                    runOnUiThread { passwordError.value = "口令不对，或文件已损坏" }
+                } else {
+                    toastOnUi(e.message ?: "文件不完整或已损坏，请在 QQ 重新下载")
+                }
             } catch (e: JmError) {
                 toastOnUi(e.message ?: "无法打开这个文件")
             } catch (e: Exception) {
