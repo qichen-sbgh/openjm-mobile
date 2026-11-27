@@ -91,6 +91,28 @@ OPENJM_TESTVECTORS=../openjm/testvectors ./gradlew :shared:testAndroidHostTest
 # iOS（⏸ 冻结）：等 Android 稳定后再用 Xcode 打开 iosApp/iosApp.xcodeproj
 ```
 
+## 发版（签名）
+
+release 包必须签名，否则手机装不上；而且**同一包名只能用同一把钥匙覆盖升级**。签名材料不入库：
+
+```bash
+# 仓库根目录 keystore.properties（已 gitignore）
+storeFile=androidApp/keystore/openjm-release.jks
+storePassword=…
+keyAlias=openjm
+keyPassword=…
+
+./gradlew :androidApp:assembleRelease
+# → androidApp/build/outputs/apk/release/androidApp-release.apk
+# 校验：apksigner verify --print-certs（v2 scheme，RSA-4096）
+```
+
+没有 `keystore.properties` 时 release 仍可构建，但产物是 unsigned、装不上——刻意不静默回退到 debug 签名，
+免得"以为发的是正式包，其实是调试签名"。
+
+> ⚠️ **这两个文件丢了，就再也发不了升级包**（换钥匙 = 换 App，用户得卸载重装）。
+> 请把 `androidApp/keystore/openjm-release.jks` 与 `keystore.properties` 一起备份到密码管理器。
+
 ## 待办
 
 **共享层**
@@ -107,6 +129,7 @@ OPENJM_TESTVECTORS=../openjm/testvectors ./gradlew :shared:testAndroidHostTest
 - [x] 口令弹窗：口令文件弹出输入框重试，先验证再落盘，错口令不留任何文件
 - [x] 进度落库：`books/index.json`（500ms 节流 + 退出补写），杀进程重进还原页码与页内偏移
 - [x] 发版瘦身：release 只打 arm64-v8a / armeabi-v7a（4 套 ABI 的 29MB → 16MB）
+- [x] 发版签名：`keystore.properties` + JKS（均不入库），`assembleRelease` 直出可安装包
 - [ ] `.jm.1` 等被 QQ 改名的情况：靠魔数判定，入口里已兼容
 
 **iOS（⏸ 冻结，等 Android 稳定后启动，见 D10）**

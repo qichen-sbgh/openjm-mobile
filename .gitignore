@@ -23,5 +23,9 @@ DerivedData/
 keys.json
 keys.*.json
 
+# 发版签名（不入库）。换一把钥匙 = 换一个 App，旧包再也覆盖安装不上
+*.jks
+keystore.properties
+
 # macOS
 .DS_Store
