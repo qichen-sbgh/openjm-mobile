@@ -1,0 +1,27 @@
+# Gradle / Kotlin
+.gradle/
+build/
+local.properties
+.kotlin/
+captures/
+*.hprof
+
+# Android Studio / IDEA
+.idea/
+*.iml
+
+# Xcode
+xcuserdata/
+*.xcworkspace/xcshareddata/IDEWorkspaceChecks.plist
+DerivedData/
+*.hmap
+*.ipa
+
+# 任何真实文档与生产密钥
+*.jm
+*.pdf
+keys.json
+keys.*.json
+
+# macOS
+.DS_Store
