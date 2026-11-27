@@ -85,7 +85,8 @@ OPENJM_TESTVECTORS=../openjm/testvectors ./gradlew :shared:testAndroidHostTest
 #   缺这个文件时 App 能起来，但导入前会提示“缺少根密钥”
 
 # 端到端回归（模拟器，一条命令跑完「空书架 → 导入 → 阅读 → 杀进程还原」）
-.\tools\emulator-e2e.ps1 -Fresh
+#   默认会先卸载重装（否则「空书架」断言不成立）；-KeepData 保留数据
+.\tools\emulator-e2e.ps1
 
 # iOS（⏸ 冻结）：等 Android 稳定后再用 Xcode 打开 iosApp/iosApp.xcodeproj
 ```
