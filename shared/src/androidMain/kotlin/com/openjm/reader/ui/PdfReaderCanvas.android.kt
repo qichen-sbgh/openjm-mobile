@@ -34,6 +34,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import java.io.File
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 
 /**
@@ -44,8 +46,8 @@ import kotlinx.coroutines.withContext
  * - **占位用首页比例**，渲染完成前先撑开同样高度，滚动时列表不跳；
  * - **进度只报"第几页 + 页内比例"**，500ms 防抖与落库交给上层（`docs/tech/mobile.md` §6）。
  *
- * `initialScrollRatio`（页内偏移恢复）这一刀没接：要等进度持久化那一片一起做，
- * 否则恢复了比例也没有可靠的高度基准。
+ * `initialScrollRatio` 会在目标页渲染完成、拿到真实页高之后再滚一次——
+ * 没有高度基准的话，比例没有意义（这也是它排在持久化之后的理由）。
  */
 @Composable
 actual fun PdfReaderCanvas(
@@ -97,6 +99,18 @@ actual fun PdfReaderCanvas(
             val listState = rememberLazyListState(
                 initialFirstVisibleItemIndex = initialPage.coerceIn(0, pageCount - 1),
             )
+
+            // 恢复页内偏移：页高要等该页渲染完才知道，所以等 heights 里出现目标页再滚。
+            LaunchedEffect(pageCount, initialPage, initialScrollRatio) {
+                if (initialScrollRatio <= 0f) return@LaunchedEffect
+                val height = snapshotFlow { heights[initialPage] }.filterNotNull().first()
+                if (height > 0) {
+                    listState.scrollToItem(
+                        index = initialPage,
+                        scrollOffset = (initialScrollRatio * height).toInt().coerceIn(0, height),
+                    )
+                }
+            }
 
             LaunchedEffect(listState, pageCount) {
                 snapshotFlow {

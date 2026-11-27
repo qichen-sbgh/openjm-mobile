@@ -31,6 +31,11 @@ android {
     buildTypes {
         getByName("release") {
             isMinifyEnabled = false
+            // PDFium 的 AAR 带四套 ABI；release 只保留真机用得上的两套（模拟器用 debug 包）。
+            // 群内直发（NFR-05）要控制体积：四套全打约 29MB，砍到两套后约 15MB。
+            ndk {
+                abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+            }
         }
     }
     compileOptions {
